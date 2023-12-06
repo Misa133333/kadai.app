@@ -1,0 +1,85 @@
+from flask import Flask, request, render_template, flash, redirect
+from werkzeug.utils import secure_filename
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from msrest.authentication import CognitiveServicesCredentials
+from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
+import numpy as np
+import os
+
+# Flaskアプリの設定
+app = Flask(__name__)
+app.secret_key = os.urandom(24)  # ここにランダムな文字列を設定
+UPLOAD_FOLDER = "uploads"
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# モデルとAzure APIの設定
+model = load_model('./model.h5')  # 学習済みモデルをロード
+key = os.environ["COMPUTER_VISION_SUBSCRIPTION_KEY"]
+endpoint = os.environ["COMPUTER_VISION_ENDPOINT"]
+computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(key))
+
+# 画像サイズとクラスの定義
+image_size = 28
+classes = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+
+# 許可されたファイルの拡張子セット
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# ファイルの拡張子が許可されているか検証する関数
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+# ルートURLのルーティング
+@app.route('/', methods=['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('ファイルがありません')
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '' or not allowed_file(file.filename):
+            flash('ファイルがありません')
+            return redirect(request.url)
+
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        # 画像解析
+        with open(filepath, "rb") as image_stream:
+            analysis_result = analyze_image(image_stream)
+            story = generate_complex_story(analysis_result.tags)
+
+        return render_template("index.html", story=story)
+
+    return render_template("index.html")
+
+# Azure Computer Vision APIを使用して画像解析を行う関数
+def analyze_image(image_stream):
+    analysis = computervision_client.analyze_image_in_stream(image_stream, visual_features=[VisualFeatureTypes.tags])
+    return analysis
+
+# 物語を生成
+def generate_complex_story(tags):
+    nature_tags = ['plant', 'flower', 'tree']
+    object_tags = ['car', 'house', 'street']
+    
+    story = ""
+    if any(tag.name in nature_tags for tag in tags):
+        story += "In a serene forest, surrounded by towering trees and vibrant flowers, a small path winds its way through the underbrush. "
+    if any(tag.name in object_tags for tag in tags):
+        story += "Alongside the path, an old abandoned car lies, its history a mystery to those who stumble upon it. "
+    if story == "":
+        story = "It's a world full of unexpected wonders and stories untold."
+
+    return story
+
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

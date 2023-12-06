@@ -1,0 +1,30 @@
+①アプリケーションを起こす
+
+cd C:\app_create\handwritten_digit_recognition
+python app.py
+
+
+
+②違うコマンドプロンプトで
+cd C:\app_create\handwritten_digit_recognition
+
+echo "# flask-mnist-app" >> README.md
+git init
+git add README.md
+git commit -m "4nd commit"
+git branch -M main
+git remote add origin https://github.com/botaidemy-cm/flask-mnist-app.git
+
+git config --global user.email "11p145nm.setusunan@gmail.com"
+git config --global user.name "Misa133333"
+
+
+git add .
+git commit -m "first commit"
+git push -u origin main
+
+または
+
+git add .
+git commit -m "4nd commit" 
+git push origin main
